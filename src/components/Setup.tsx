@@ -80,7 +80,14 @@ export function Setup() {
       <section className="space-y-1">
         <h2 className="font-semibold text-zinc-100">ESPN</h2>
         <Row label="League ID">
-          <input value={s.espn.leagueId} className={`${input} w-28`} onChange={(e) => s.set({ espn: { ...s.espn, leagueId: e.target.value.trim() } })} />
+          <input
+            key={s.espn.leagueId}
+            defaultValue={s.espn.leagueId}
+            className={`${input} w-28`}
+            // Applied on Enter or blur, so a half-typed ID never loads someone else's league.
+            onBlur={(e) => s.set({ espn: { ...s.espn, leagueId: e.target.value.trim() } })}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          />
         </Row>
         <Row label="Picks">
           <Toggle on={synced} onClick={(sync) => s.set({ espn: { ...s.espn, sync } })} labels={['Sync from ESPN', 'Enter manually']} />
@@ -169,18 +176,19 @@ export function Setup() {
         </Row>
       </section>
 
-      {!synced && (
-        <section className="space-y-1">
-          <h2 className="font-semibold text-zinc-100">Draft</h2>
+      <section className="space-y-1">
+        <h2 className="font-semibold text-zinc-100">New draft</h2>
+        <div className="flex items-baseline gap-3">
           <button
-            className="text-rose-400 hover:text-rose-300 disabled:text-zinc-700"
-            disabled={!s.picks.some((p) => !p.keeper)}
-            onClick={() => confirm('Clear all picks?') && s.set({ picks: s.picks.filter((p) => p.keeper) })}
+            className="shrink-0 text-rose-400 hover:text-rose-300 disabled:text-zinc-700"
+            disabled={!s.punts.length && (synced || !s.picks.some((p) => !p.keeper))}
+            onClick={() => confirm(synced ? 'Clear punts for a new draft?' : 'Clear punts and picks for a new draft?') && s.newDraft()}
           >
-            Reset picks
+            Start new draft
           </button>
-        </section>
-      )}
+          <span className="text-zinc-500">{synced ? 'Clears punts.' : 'Clears punts and picks.'} Each league keeps its own punts, so a new league starts with none.</span>
+        </div>
+      </section>
     </div>
   )
 }

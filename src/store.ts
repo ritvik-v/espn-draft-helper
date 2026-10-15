@@ -31,6 +31,9 @@ type State = {
   espn: { leagueId: string; sync: boolean }
   /** Slot owning each overall pick, from ESPN. Null means a plain snake. */
   pickOwners: number[] | null
+  /** League the current punts belong to. */
+  draftLeague: string | null
+  puntsByLeague: Record<string, Cat[]>
   picks: Pick[]
   sections: Section[]
   selectedId: number | null
@@ -45,6 +48,10 @@ type Actions = {
   togglePunt: (c: Cat) => void
   draft: (playerId: number, slot?: number) => void
   undo: () => void
+  /** Swaps in that league's punts (none for a new draft) and saves this one's. */
+  enterLeague: (leagueId: string) => void
+  /** Clears this draft's punts, and hand-entered picks when not synced. Keepers stay. */
+  newDraft: () => void
   removePick: (playerId: number) => void
   applyLeague: (league: League, swid: string | null) => void
   setSections: (sections: Section[]) => void
@@ -78,6 +85,8 @@ export const useDraft = create<State & Actions>()(
       hashtag: null,
       espn: { leagueId: '', sync: true },
       pickOwners: null,
+      draftLeague: null,
+      puntsByLeague: {},
       picks: [],
       sections: [],
       selectedId: null,
@@ -107,6 +116,19 @@ export const useDraft = create<State & Actions>()(
       },
 
       undo: () => set((s) => ({ picks: s.picks.slice(0, -1) })),
+
+      enterLeague: (leagueId) =>
+        set((s) =>
+          s.draftLeague === leagueId
+            ? s
+            : {
+                puntsByLeague: s.draftLeague ? { ...s.puntsByLeague, [s.draftLeague]: s.punts } : s.puntsByLeague,
+                punts: s.puntsByLeague[leagueId] ?? [],
+                draftLeague: leagueId,
+              },
+        ),
+
+      newDraft: () => set((s) => ({ punts: [], picks: s.espn.sync ? s.picks : s.picks.filter((p) => p.keeper) })),
 
       removePick: (playerId) => set((s) => ({ picks: s.picks.filter((p) => p.playerId !== playerId) })),
 
@@ -203,7 +225,7 @@ export const useDraft = create<State & Actions>()(
   ),
 )
 
-/** Hover preview and league sync status. They change often, so they stay out of the persisted store. */
+/** Changes often, so kept out of the persisted store. */
 export const useSession = create<{ previewId: number | null; league: { ok: boolean; error: string | null } }>()(() => ({
   previewId: null,
   league: { ok: false, error: null },

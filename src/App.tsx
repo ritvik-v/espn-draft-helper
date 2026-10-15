@@ -36,7 +36,6 @@ function useLiveDraft() {
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage) return
     chrome.storage.local.get('liveDraft').then((s) => setStored((s.liveDraft as LiveDraft | undefined) ?? null))
-    // Only the feed's own key.
     const onChange = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       if (area === 'local' && changes.liveDraft) setStored((changes.liveDraft.newValue as LiveDraft | undefined) ?? null)
     }
@@ -65,8 +64,10 @@ function useLeagueSync(live: LiveDraft | null) {
     useSession.setState({ league: { ok: league.isSuccess, error: league.error?.message ?? null } })
   }, [league.isSuccess, league.error])
   useEffect(() => {
-    if (league.data) applyLeague(picks ? mergeLivePicks(league.data, picks) : league.data, swid.data ?? null)
-  }, [league.data, picks, swid.data, applyLeague])
+    if (!league.data) return
+    useDraft.getState().enterLeague(leagueId)
+    applyLeague(picks ? mergeLivePicks(league.data, picks) : league.data, swid.data ?? null)
+  }, [league.data, leagueId, picks, swid.data, applyLeague])
   return { league, practice: !!live && live.leagueId !== espn.leagueId }
 }
 

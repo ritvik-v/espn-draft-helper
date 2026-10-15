@@ -50,6 +50,8 @@ Tags in parentheses are optional, and a cell can have several: `Trae Young (FG o
 3. **Join ESPN's draft room and keep it open.** Picks come from the room's live feed, because ESPN's league API doesn't update during a draft. Joining late or reloading is fine: the room sends a full board on join and the panel catches up. The extension only listens to the room. It never changes ESPN's page, and only runs on ESPN fantasy basketball pages.
 4. On the clock, read the **Take** line under the clock: the best two players by Now. Click one to see him in Players. Buckets shows the same call by tier: take from the highest bucket marked "take one now", and skip players marked "can wait".
 
+Each league keeps its own punts, so a mock draft's punts don't follow you into your real one, and returning to a league brings its punts back. Setup → **Start new draft** clears them by hand.
+
 ESPN's practice drafts work the same way, so a mock is a full rehearsal.
 
 ## Reading a player row

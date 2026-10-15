@@ -16,7 +16,6 @@
     ...data,
     get() {
       const value = data.get.call(this)
-      // The page always gets its value back untouched, even if forwarding fails.
       try {
         if (!forwarded.has(this) && this.target instanceof NativeWS && typeof value === 'string' && KEEP.test(value)) {
           forwarded.add(this)

@@ -3,7 +3,6 @@ import { useDraft, useSession } from './store'
 
 type Item = { label: string; ok: boolean; pending?: boolean; detail: string }
 
-/** The three things a draft needs: your league, projections and tiers. */
 export function useSetupStatus(): Item[] {
   const { espn, teamCount, mySlot, hashtag, sections } = useDraft()
   const league = useSession((s) => s.league)

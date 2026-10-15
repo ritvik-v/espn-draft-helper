@@ -19,7 +19,7 @@ const ESPN_UNDRAFTED = 139
 // ESPN leagues draft from ESPN's board, so its ADP predicts them better than Fantrax's.
 const ESPN_WEIGHT = 2
 
-/** Weighted mean of the sources that actually draft him, ESPN counting double. Null means neither does. */
+/** Weighted mean over the sources that draft him; null if neither does. */
 export function blendAdp(espn: number | null, fantrax: number | undefined) {
   const sources = [
     ...(espn !== null && espn < ESPN_UNDRAFTED ? [{ adp: espn, w: ESPN_WEIGHT }] : []),

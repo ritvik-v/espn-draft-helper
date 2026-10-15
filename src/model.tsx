@@ -118,10 +118,9 @@ function useBuildModel() {
   )
 
   const now = useMemo(() => nowScores(teams.fit, availAtTarget), [teams.fit, availAtTarget])
-  // With an empty roster fit is just value; from your third pick, Now is the order to pick in.
+  // Fit equals value on an empty roster, so Now leads from the third pick.
   const nowFirst = (teams.rosters[mySlot]?.length ?? 0) >= 2
   const nowMax = Math.max(0, ...now.values())
-  // Best three tiered players by Now, highlighted on the board.
   const topNow = useMemo(
     () => new Set([...now].filter(([id]) => tiersByPlayer.has(id)).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => id)),
     [now, tiersByPlayer],

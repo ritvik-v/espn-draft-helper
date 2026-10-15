@@ -50,7 +50,6 @@ export function ClockBar({
   // When the last pick came out of your buckets, say which one and what's left in it.
   const lastTier = last && tiersByPlayer.get(last.playerId)?.[0]
   const lastTierLeft = lastTier?.section.entries.filter((e) => e.playerId !== null && !draft.drafted.has(e.playerId)).length
-  // Best two by Now, skipping anyone who'd cost a starter when slots are tight.
   const soon = myTurn || (away !== null && away <= 2)
   const best = soon
     ? [...now].filter(([id]) => !draft.drafted.has(id) && (!slots.tight || slots.fills(allPlayers.get(id)?.pos ?? ''))).sort((a, b) => b[1] - a[1]).slice(0, 2)
