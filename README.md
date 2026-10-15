@@ -2,6 +2,8 @@
 
 # Bucket List
 
+Forked from [clayclark/BucketList](https://github.com/clayclark/BucketList) by Clay Clark, adapted to draft from imported Hashtag Basketball projections and consensus rankings.
+
 A Chrome extension for ESPN 9-cat H2H fantasy basketball drafts (works in any Chromium browser: Chrome, Helium, Arc, Brave, Edge). It sits in the side panel next to ESPN's draft room, follows every pick as it happens, and answers the two questions that matter on the clock: **who fits my team**, and **who won't last until my next pick**.
 
 | On the clock | Player detail | Team |
