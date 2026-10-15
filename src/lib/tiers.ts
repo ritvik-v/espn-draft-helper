@@ -1,8 +1,7 @@
 export type TierEntry = { id: string; playerId: number | null; name: string; tag: string | null }
 export type Section = { id: string; name: string; note: string | null; entries: TierEntry[] }
 
-export const DEFAULT_SHEET =
-  'https://docs.google.com/spreadsheets/d/12sHhQrIJdpkuC4nhnA3wyLUKuXD3ZmqUld_S03ddItM/edit?usp=sharing'
+export const DEFAULT_SHEET = ''
 
 export const sheetCsvUrl = (url: string) => {
   const id = url.match(/\/d\/([\w-]+)/)?.[1]
@@ -139,21 +138,4 @@ export function sectionsToRows(sections: Section[], perRow = 8): string[][] {
     rows.push([])
   }
   return rows
-}
-
-const withoutNote = (name: string) => name.split('(')[0].trim()
-
-/** Short bucket names for tight spots: "Bucket 7" → "B7", "Health Bucket" → "Health", "Flier Tier 2" → "Flier 2". */
-export const shortBucket = (name: string) =>
-  withoutNote(name).replace(/^Bucket\s+/i, 'B').replace(/\s+Bucket$/i, '').replace(/^Upside\s+/i, '').replace(/\s+Tier\s+/i, ' ')
-
-/** Tightest bucket code for ESPN's rows: "Bucket 7" → "B7", "Flier Tier 2" → "F2", "Upside Fliers" → "UF", "Health Bucket" → "H". */
-export const bucketCode = (name: string) => {
-  const numbered = withoutNote(name).match(/^Bucket\s+(\d+)$/i)
-  if (numbered) return `B${numbered[1]}`
-  return withoutNote(name)
-    .split(/\s+/)
-    .filter((w) => !/^(bucket|tier)$/i.test(w))
-    .map((w) => (/^\d+$/.test(w) ? w : w[0].toUpperCase()))
-    .join('')
 }

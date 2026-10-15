@@ -9,7 +9,7 @@ const line = (o: Partial<StatLine>): StatLine => ({
 
 const player = (id: number, stats: StatLine): Player => ({
   id, name: `P${id}`, team: 'DEN', pos: 'C', injury: null, adp: id, rank: id,
-  proj: { gp: 70, min: 30, stats }, last: null,
+  proj: { gp: 70, min: 30, stats }, last: null, hashtag: null,
 })
 
 const players = [

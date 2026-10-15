@@ -19,7 +19,6 @@ const Group = ({ title, children }: { title: string; children: ReactNode }) => (
   </section>
 )
 
-const Bar = ({ color }: { color: string }) => <span className="inline-block h-4 w-1 rounded-sm" style={{ backgroundColor: color }} />
 
 /** What every color and number means, with the real samples. */
 export function Key() {
@@ -49,8 +48,8 @@ export function Key() {
           His 9 categories in strip order ({CATS.map((c) => CAT_LABEL[c]).join(' ')}). Green helps, red hurts, faded is punted.
         </Line>
         <Line sample={<span className="text-zinc-300">4.1</span>}>Val: his total across your non-punted categories. Same for every team.</Line>
-        <Line sample={<span className="font-semibold text-amber-300">+0.43</span>}>
-          Fit: about 0.4 more categories won per week if you add him to your roster. Amber is your top 3.
+        <Line sample={<span className="font-semibold text-amber-300">+0.31</span>}>
+          Now: what taking him adds over this pick and your next. Low when he'll likely be back. Amber is your top 3. Fit (categories gained per week) is in his details.
         </Line>
         <Line
           sample={
@@ -82,19 +81,6 @@ export function Key() {
         </Line>
       </Group>
 
-      <Group title="In ESPN's draft room">
-        <Line
-          sample={
-            <>
-              <Bar color="#f43f5e" /> <Bar color="#10b981" /> <Bar color="#38bdf8" />
-            </>
-          }
-        >
-          Take now, can wait, in your buckets.
-        </Line>
-        <Line sample={<span className="text-zinc-300">B6</span>}>Bucket code under ESPN's rank.</Line>
-        <Line sample={<span className="text-zinc-300">4.0 +.55 49%</span>}>Value, fit, and chance he's back (shown under 95%). Hover a row for his categories.</Line>
-      </Group>
     </div>
   )
 }

@@ -1,14 +1,14 @@
 import { useEffect, useRef, type HTMLAttributes, type ReactNode } from 'react'
 import { signed } from '../format'
 import { useModel } from '../model'
-import { useDraft } from '../store'
+import { useDraft, useSession } from '../store'
 import { Avail, Fingerprint, Injury } from '../ui'
 import { PlayerDetail } from './PlayerDetail'
 
 export type DragProps = Pick<HTMLAttributes<HTMLDivElement>, 'draggable' | 'onDragStart' | 'onDragOver' | 'onDrop'>
 
 /**
- * One player, the same everywhere: name and tags, the 9-category heat strip, fit and the chance he's
+ * One player, the same everywhere: name and tags, the 9-category heat strip, value, Now and the chance he's
  * back at your next pick. Hover previews him in the category strip; click expands details in place.
  */
 export function PlayerRow({
@@ -28,7 +28,7 @@ export function PlayerRow({
   over?: boolean
   trailing?: ReactNode
 }) {
-  const { byId, allPlayers, draft, availAtTarget, teams, slots, topFit } = useModel()
+  const { byId, allPlayers, draft, availAtTarget, now, nowMax, slots, topNow } = useModel()
   const { mySlot, teamAbbrevs, selectedId, punts, espn, set, draft: draftPlayer } = useDraft()
   const ref = useRef<HTMLDivElement>(null)
   const selected = selectedId === id
@@ -38,7 +38,7 @@ export function PlayerRow({
   // A row can disappear under the cursor (tab switch, player drafted) without a mouseleave.
   useEffect(
     () => () => {
-      if (useDraft.getState().previewId === id) useDraft.getState().set({ previewId: null })
+      if (useSession.getState().previewId === id) useSession.setState({ previewId: null })
     },
     [id],
   )
@@ -48,7 +48,7 @@ export function PlayerRow({
   const v = byId.get(id)
   const taken = draft.drafted.get(id)
   const mine = taken?.slot === mySlot
-  const fit = teams.fit.get(id)
+  const gain = now.get(id)
   const noSlot = !taken && slots.tight && !slots.fills(player.pos)
 
   return (
@@ -62,8 +62,8 @@ export function PlayerRow({
         className={`flex h-7 cursor-default items-center gap-1.5 ${selected ? '' : 'hover:bg-zinc-950'}`}
         onClick={() => set({ selectedId: selected ? null : id })}
         onDoubleClick={() => !espn.sync && !taken && draftPlayer(id)}
-        onMouseEnter={() => set({ previewId: id })}
-        onMouseLeave={() => set({ previewId: null })}
+        onMouseEnter={() => useSession.setState({ previewId: id })}
+        onMouseLeave={() => useSession.setState({ previewId: null })}
       >
         <span className={`truncate ${mine ? 'text-emerald-400' : taken ? 'text-zinc-600 line-through' : 'text-zinc-100'}`}>{player.name}</span>
         {tag}
@@ -84,10 +84,13 @@ export function PlayerRow({
               {v && <Fingerprint z={v.z} punts={punts} detailed={detailed} />}
               <span className="w-8 text-zinc-300">{v ? v.value.toFixed(1) : '-'}</span>
               <span
-                className={`w-10 ${topFit.has(id) ? 'font-semibold text-amber-300' : fit !== undefined && fit > 0 ? 'text-zinc-400' : 'text-zinc-600'}`}
-                title={topFit.has(id) ? 'Top 3 fit for your team' : 'Extra categories won per matchup'}
+                className={`relative w-10 ${topNow.has(id) ? 'font-semibold text-amber-300' : gain !== undefined && gain > 0.05 ? 'text-zinc-200' : 'text-zinc-600'}`}
+                title={topNow.has(id) ? 'One of your 3 best picks now' : 'Now: what taking him adds over this pick and your next'}
               >
-                {fit === undefined ? '' : signed(fit, 2)}
+                {gain !== undefined && gain > 0 && nowMax > 0 && (
+                  <span className="absolute inset-y-0 right-0 rounded-sm bg-emerald-400/20" style={{ width: `${(gain / nowMax) * 100}%` }} />
+                )}
+                <span className="relative">{gain === undefined ? '' : signed(gain, 2)}</span>
               </span>
               <span className="w-9">
                 <Avail p={availAtTarget(id)} />

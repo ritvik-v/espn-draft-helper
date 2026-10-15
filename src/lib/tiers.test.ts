@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bucketCode, entryRange, nameMatcher, pickRange, parseTierSheet, sectionsToRows, sheetCsvUrl, shortBucket } from './tiers'
+import { entryRange, nameMatcher, pickRange, parseTierSheet, sectionsToRows, sheetCsvUrl } from './tiers'
 
 const players = [
   { id: 1, name: 'Stephen Curry' },
@@ -74,14 +74,4 @@ it('writes buckets back in the sheet layout so they re-import unchanged', () => 
   const csv = sectionsToRows(sections).map((r) => r.join(',')).join('\n')
   const strip = (s: typeof sections) => s.map(({ name, note, entries }) => ({ name, note, entries: entries.map(({ name, tag, playerId }) => ({ name, tag, playerId })) }))
   expect(strip(parseTierSheet(csv, match))).toEqual(strip(sections))
-})
-
-it('shortens bucket names for the draft room badges', () => {
-  expect(['Bucket 7', 'Health Bucket', 'Upside Fliers', 'Flier Tier 2', 'Spillage'].map(shortBucket)).toEqual(['B7', 'Health', 'Fliers', 'Flier 2', 'Spillage'])
-  expect(shortBucket('Upside Fliers (~100+)')).toBe('Fliers')
-})
-
-it('codes bucket names tightly enough to fit ESPN rows', () => {
-  expect(['Bucket 12', 'Health Bucket', 'Upside Fliers', 'Flier Tier 2', 'Spillage'].map(bucketCode)).toEqual(['B12', 'H', 'UF', 'F2', 'S'])
-  expect(bucketCode('Upside Fliers (~100+)')).toBe('UF')
 })

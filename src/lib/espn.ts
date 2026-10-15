@@ -18,14 +18,16 @@ export type Player = {
   team: string
   pos: string
   injury: string | null
-  /** Fantrax ADP (ESPN's if Fantrax is down), merged in by the model. Null means nobody drafts him. */
+  /** ESPN ADP, blended with Fantrax by the model. Null means nobody drafts him. */
   adp: number | null
   rank: number
   proj: Basis | null
   last: Basis | null
+  /** Hashtag Basketball projection, merged in by the model from an imported CSV. */
+  hashtag: Basis | null
 }
 
-export type BasisKey = 'proj' | 'last'
+export type BasisKey = 'proj' | 'last' | 'hashtag'
 
 const PRO_TEAMS: Record<number, string> = {
   0: 'FA', 1: 'ATL', 2: 'BOS', 3: 'NO', 4: 'CHI', 5: 'CLE', 6: 'DAL', 7: 'DEN', 8: 'DET', 9: 'GS', 10: 'HOU',
@@ -70,7 +72,7 @@ const toBasis = (entry: EspnStatEntry | undefined): Basis | null => {
   }
 }
 
-export async function fetchPlayers(): Promise<(Omit<Player, 'adp'> & { espnAdp: number | null })[]> {
+export async function fetchPlayers(): Promise<Omit<Player, 'hashtag'>[]> {
   const filter = {
     players: {
       limit: 1200,
@@ -92,7 +94,7 @@ export async function fetchPlayers(): Promise<(Omit<Player, 'adp'> & { espnAdp: 
     pos: POSITIONS.filter((_, i) => p.eligibleSlots.includes(i)).join('/'),
     injury: p.injuryStatus && p.injuryStatus !== 'ACTIVE' ? p.injuryStatus : null,
     rank: p.draftRanksByRankType?.STANDARD?.rank ?? 999,
-    espnAdp: p.ownership?.averageDraftPosition || null,
+    adp: p.ownership?.averageDraftPosition || null,
     proj: toBasis(p.stats?.find((s) => s.id === `10${SEASON}`)),
     last: toBasis(p.stats?.find((s) => s.id === `00${SEASON - 1}`)),
   }))

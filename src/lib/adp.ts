@@ -13,3 +13,18 @@ export async function fetchFantraxAdp(players: { id: number; name: string }[]) {
   }
   return adp
 }
+
+// ESPN parks players nobody drafts at an ADP of about 140, so anything this late isn't a real pick.
+const ESPN_UNDRAFTED = 139
+// ESPN leagues draft from ESPN's board, so its ADP predicts them better than Fantrax's.
+const ESPN_WEIGHT = 2
+
+/** Weighted mean of the sources that actually draft him, ESPN counting double. Null means neither does. */
+export function blendAdp(espn: number | null, fantrax: number | undefined) {
+  const sources = [
+    ...(espn !== null && espn < ESPN_UNDRAFTED ? [{ adp: espn, w: ESPN_WEIGHT }] : []),
+    ...(fantrax !== undefined ? [{ adp: fantrax, w: 1 }] : []),
+  ]
+  const w = sources.reduce((n, s) => n + s.w, 0)
+  return w ? sources.reduce((n, s) => n + s.adp * s.w, 0) / w : null
+}

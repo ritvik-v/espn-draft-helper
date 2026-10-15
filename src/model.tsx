@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { createContext, use, useCallback, useMemo, type ReactNode } from 'react'
 import { CATS, type Cat, type CatLine } from './lib/cats'
-import { fetchFantraxAdp } from './lib/adp'
+import { blendAdp, fetchFantraxAdp } from './lib/adp'
 import { availability, openPicks } from './lib/draft'
+import { nowScores } from './lib/now'
 import { fetchPlayers, type Player } from './lib/espn'
 import { openSlots } from './lib/slots'
 import { entryRange, type Section, type TierEntry } from './lib/tiers'
@@ -21,12 +22,12 @@ function useBuildModel() {
     enabled: !!espn.data,
     staleTime: 60 * 60 * 1000,
   })
-  // ESPN's ADP only stands in if Fantrax is down. Players Fantrax doesn't list go undrafted there, while ESPN
-  // parks its undrafted players near pick 140, ahead of real Fantrax picks.
+  const hashtag = useDraft((s) => s.hashtag)
+  // ESPN ADP alone if Fantrax is down; ESPN projections for anyone the Hashtag CSV lacks.
   const data = useMemo(
     (): Player[] | undefined =>
-      espn.data?.map(({ espnAdp, ...p }) => ({ ...p, adp: fantrax.data ? (fantrax.data.get(p.id) ?? null) : espnAdp })),
-    [espn.data, fantrax.data],
+      espn.data?.map((p) => ({ ...p, adp: blendAdp(p.adp, fantrax.data?.get(p.id)), hashtag: hashtag ? (hashtag.lines[p.id] ?? p.proj) : null })),
+    [espn.data, fantrax.data, hashtag],
   )
   const players = { ...espn, data }
   const { teamCount, rosterSize, mySlot, punts, basis, totals, picks, sections, pickOwners, starters } = useDraft()
@@ -106,16 +107,6 @@ function useBuildModel() {
     return out
   }, [sections])
 
-  // Best three available fits among tiered players, highlighted on the board.
-  const topFit = useMemo(() => {
-    const tiered = teams.available.filter((v) => tiersByPlayer.has(v.player.id) && teams.fit.has(v.player.id))
-    return new Set(
-      tiered
-        .sort((a, b) => (teams.fit.get(b.player.id) ?? 0) - (teams.fit.get(a.player.id) ?? 0))
-        .slice(0, 3)
-        .map((v) => v.player.id),
-    )
-  }, [teams, tiersByPlayer])
 
   const availAtTarget = useCallback(
     (id: number) => {
@@ -126,7 +117,17 @@ function useBuildModel() {
     [allPlayers, draft],
   )
 
-  // The take-now-or-wait read on your buckets, shared by the Buckets view and the draft room badges.
+  const now = useMemo(() => nowScores(teams.fit, availAtTarget), [teams.fit, availAtTarget])
+  // With an empty roster fit is just value; from your third pick, Now is the order to pick in.
+  const nowFirst = (teams.rosters[mySlot]?.length ?? 0) >= 2
+  const nowMax = Math.max(0, ...now.values())
+  // Best three tiered players by Now, highlighted on the board.
+  const topNow = useMemo(
+    () => new Set([...now].filter(([id]) => tiersByPlayer.has(id)).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => id)),
+    [now, tiersByPlayer],
+  )
+
+  // The take-now-or-wait read on your buckets.
   const outlook = useMemo(() => {
     const isOpen = (e: TierEntry) => e.playerId === null || !draft.drafted.has(e.playerId)
     // Players whose sheet range ("40-55", "35+") starts after your pick stay listed, since you can still take
@@ -149,7 +150,7 @@ function useBuildModel() {
     return { isOpen, inPlay, pick, live, current: live[0]?.id, expected, soon, lastChance, waitBuckets, canWait }
   }, [sections, draft, availAtTarget, mySlot])
 
-  return { players, allPlayers, valued, byId, draft, teams, ranks, slots, topFit, tiersByPlayer, outlook, availAtTarget, cats: activeCats(punts) }
+  return { players, allPlayers, valued, byId, draft, teams, now, nowFirst, nowMax, ranks, slots, topNow, tiersByPlayer, outlook, availAtTarget, cats: activeCats(punts) }
 }
 
 export type Model = ReturnType<typeof useBuildModel>

@@ -4,9 +4,11 @@ import { pickRange, type Section, type TierEntry } from '../lib/tiers'
 import { useModel } from '../model'
 import { useDraft } from '../store'
 import { PlayerRow, type DragProps } from './PlayerRow'
+import { useSetupStatus } from '../useSetupStatus'
+import { Banner } from '../ui'
 
 type Drag = { kind: 'entry' | 'section'; id: string }
-type Order = 'sheet' | 'value' | 'fit' | 'avail'
+type Order = 'sheet' | 'value' | 'now' | 'avail'
 const DRAG_TYPE = 'application/x-bucket-list'
 
 const readDrag = (e: DragEvent): Drag | null => {
@@ -15,11 +17,14 @@ const readDrag = (e: DragEvent): Drag | null => {
 }
 
 export function Buckets() {
-  const { sections, showTaken, set, addSection } = useDraft()
-  const { draft, players, availAtTarget, allPlayers, outlook } = useModel()
+  const { sections, sheetUrl, showTaken, set, addSection } = useDraft()
+  const { draft, players, availAtTarget, allPlayers, outlook, nowFirst } = useModel()
+  const missing = useSetupStatus().filter((i) => !i.ok && !i.pending)
   const [editing, setEditing] = useState(false)
   const [over, setOver] = useState<string | null>(null)
-  const [order, setOrder] = useState<Order>('sheet')
+  const [chosen, setOrder] = useState<Order | null>(null)
+  // Dragging only works in your own order, so editing shows it.
+  const order = editing ? 'sheet' : (chosen ?? (nowFirst ? 'now' : 'sheet'))
 
   const { isOpen, inPlay, live, current, expected, soon, lastChance, canWait } = outlook
   const available = (e: TierEntry) => e.playerId === null || !draft.drafted.has(e.playerId)
@@ -30,20 +35,36 @@ export function Buckets() {
   // Column headers sort within each bucket; clicking the active one goes back to your sheet order.
   const col = (o: Order, label: string, className: string, title: string) => (
     <button
-      className={`${className} text-right ${order === o ? 'text-amber-300' : 'hover:text-zinc-300'}`}
+      className={`${className} text-right ${order === o ? 'text-zinc-100' : 'hover:text-zinc-300'}`}
       title={title}
       onClick={() => setOrder(order === o ? 'sheet' : o)}
     >
       {label}
+      {order === o && '▾'}
     </button>
   )
 
   if (!sections.length) {
-    return <div className="p-3 text-zinc-500">{players.isPending ? 'Loading players…' : 'Importing tier sheet…'}</div>
+    if (players.isPending || sheetUrl) {
+      return <div className="p-3 text-zinc-500">{players.isPending ? 'Loading players…' : 'Importing tier sheet…'}</div>
+    }
+    return (
+      <div className="p-3 text-zinc-500">
+        No tiers yet.{' '}
+        <button className="text-amber-300 hover:text-amber-200" onClick={() => set({ tab: 'Setup' })}>
+          Import your rankings CSV in Setup
+        </button>
+      </div>
+    )
   }
 
   return (
     <div>
+      {missing.length > 0 && (
+        <Banner action="Setup" onAction={() => set({ tab: 'Setup' })}>
+          Not set up: {missing.map((i) => i.label).join(', ')}
+        </Banner>
+      )}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-zinc-900 bg-black px-3 py-1 text-[11px] text-zinc-500">
         <button className={showTaken ? 'text-zinc-200' : textBtn} onClick={() => set({ showTaken: !showTaken })}>
           {showTaken ? 'Hide taken' : 'Show taken'}
@@ -54,7 +75,7 @@ export function Buckets() {
         {players.isPending && <span>Loading players…</span>}
         <span className="ml-auto flex gap-2">
           {col('value', 'Val', 'w-8', 'Value: total of your non-punted categories')}
-          {col('fit', 'Fit', 'w-10', 'Fit: extra categories won per matchup')}
+          {col('now', 'Now', 'w-10', 'Now: what taking him adds over this pick and your next')}
           {col('avail', draft.target ? `#${draft.target}` : 'Left', 'w-9', "Chance he's still there at your next pick. Click to sort by ADP")}
           {editing && <span className="w-3" />}
         </span>
@@ -134,15 +155,21 @@ function Bucket({
   setOver: (id: string | null) => void
 }) {
   const { moveEntry, moveSection, renameSection, removeSection, removeEntry, showTaken } = useDraft()
-  const { draft, byId, teams, outlook, allPlayers } = useModel()
+  const { draft, byId, now, outlook, allPlayers } = useModel()
   const [renaming, setRenaming] = useState(false)
 
   const open = section.entries.filter(isOpen)
+  const adps = open.flatMap((e) => {
+    const adp = e.playerId === null ? null : allPlayers.get(e.playerId)?.adp
+    return adp ? [Math.round(adp)] : []
+  })
+  const [lo, hi] = [Math.min(...adps), Math.max(...adps)]
+  const adpRange = adps.length ? (lo === hi ? `${lo}` : `${lo}–${hi}`) : null
   const visible = showTaken || editing ? section.entries : section.entries.filter((e) => e.playerId === null || !draft.drafted.has(e.playerId))
   const score = (e: TierEntry) => {
     if (e.playerId === null || !isOpen(e)) return -Infinity
     if (order === 'value') return byId.get(e.playerId)?.value ?? -99
-    if (order === 'fit') return teams.fit.get(e.playerId) ?? -99
+    if (order === 'now') return now.get(e.playerId) ?? -99
     // By ADP, earliest first: the order the room takes them, without the ties at 0% and 100%.
     return -(allPlayers.get(e.playerId)?.adp ?? 999)
   }
@@ -219,6 +246,11 @@ function Bucket({
           </span>
         )}
         {section.note && <span className="truncate text-[11px] text-zinc-600">{section.note}</span>}
+        {adpRange && (
+          <span className="min-w-0 truncate text-[11px] text-zinc-600" title="ADP of who's left in this tier">
+            ADP {adpRange}
+          </span>
+        )}
         {editing && (
           <button
             className="ml-auto text-zinc-600 hover:text-rose-400"

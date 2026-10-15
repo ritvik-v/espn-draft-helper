@@ -1,9 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { input, textBtn } from '../format'
+import { parseHashtag } from '../lib/hashtag'
 import { importSheet } from '../lib/importSheet'
-import { sectionsToRows } from '../lib/tiers'
+import { parseRankings } from '../lib/rankings'
+import { nameMatcher, sectionsToRows } from '../lib/tiers'
 import { useModel } from '../model'
 import { useDraft } from '../store'
+import { SetupChecklist } from './SetupChecklist'
 
 const Row = ({ label, children }: { label: string; children: ReactNode }) => (
   <label className="flex min-h-6 items-center gap-3">
@@ -27,6 +30,7 @@ export function Setup() {
   const s = useDraft()
   const { players } = useModel()
   const [sheetStatus, setSheetStatus] = useState('')
+  const [hashtagStatus, setHashtagStatus] = useState('')
   const unmatched = s.sections.flatMap((x) => x.entries).filter((e) => e.playerId === null).length
   const synced = s.espn.sync
 
@@ -42,8 +46,37 @@ export function Setup() {
     }
   }
 
+  const importRankings = async (file: File | undefined) => {
+    if (!file || !players.data) return
+    if (s.sections.length && !confirm('Replace your tiers (and any edits) with the rankings?')) return
+    try {
+      const sections = parseRankings(await file.text(), nameMatcher(players.data))
+      s.setSections(sections)
+      setSheetStatus(`${sections.length} tiers`)
+    } catch (e) {
+      setSheetStatus(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const importHashtag = async (file: File | undefined) => {
+    if (!file || !players.data) return
+    try {
+      const { lines, unmatched } = parseHashtag(await file.text(), players.data)
+      s.set({ hashtag: { lines, importedAt: Date.now(), unmatched }, basis: 'hashtag' })
+      const count = Object.keys(lines).length
+      setHashtagStatus(`${count} players${unmatched.length ? `, unmatched: ${unmatched.join(', ')}` : ''}`)
+    } catch (e) {
+      setHashtagStatus(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   return (
     <div className="max-w-xl space-y-5 p-3">
+      <section className="space-y-1">
+        <h2 className="font-semibold text-zinc-100">Ready to draft</h2>
+        <SetupChecklist />
+      </section>
+
       <section className="space-y-1">
         <h2 className="font-semibold text-zinc-100">ESPN</h2>
         <Row label="League ID">
@@ -78,7 +111,25 @@ export function Setup() {
       <section className="space-y-1">
         <h2 className="font-semibold text-zinc-100">Values</h2>
         <Row label="Stats">
-          <Toggle on={s.basis === 'proj'} onClick={(proj) => s.set({ basis: proj ? 'proj' : 'last' })} labels={['ESPN projections', 'Last season']} />
+          <span className="flex gap-3">
+            {([['hashtag', 'Hashtag'], ['proj', 'ESPN projections'], ['last', 'Last season']] as const).map(([key, label]) => (
+              <button key={key} className={s.basis === key ? 'text-zinc-100' : textBtn} disabled={key === 'hashtag' && !s.hashtag}
+                onClick={() => s.set({ basis: key })}>
+                {label}
+              </button>
+            ))}
+          </span>
+        </Row>
+        <Row label="Hashtag CSV">
+          <input type="file" accept=".csv,text/csv" className="min-w-0 flex-1 text-zinc-400" disabled={!players.data} onChange={(e) => {
+            importHashtag(e.target.files?.[0])
+            e.target.value = ''
+          }} />
+        </Row>
+        <Row label="">
+          <span className="text-zinc-500">
+            {hashtagStatus || (s.hashtag ? `Imported ${new Date(s.hashtag.importedAt).toLocaleString()}` : 'Export with Z Score off')}
+          </span>
         </Row>
         <Row label="Scale">
           <Toggle on={!s.totals} onClick={(perGame) => s.set({ totals: !perGame })} labels={['Per game', 'Season totals']} />
@@ -87,12 +138,18 @@ export function Setup() {
 
       <section className="space-y-1">
         <h2 className="font-semibold text-zinc-100">Tier sheet</h2>
+        <Row label="Rankings CSV">
+          <input type="file" accept=".csv,text/csv" className="min-w-0 flex-1 text-zinc-400" disabled={!players.data} onChange={(e) => {
+            importRankings(e.target.files?.[0])
+            e.target.value = ''
+          }} />
+        </Row>
         <Row label="Google Sheet">
           <input value={s.sheetUrl} className={`${input} min-w-0 flex-1`} onChange={(e) => s.set({ sheetUrl: e.target.value })} />
         </Row>
         <Row label="">
           <button className="text-amber-300 hover:text-amber-200" onClick={reimport}>
-            Re-import
+            Import sheet
           </button>
           <span className="text-zinc-500">{sheetStatus}</span>
           {unmatched > 0 && <span className="text-rose-400">{unmatched} unmatched</span>}

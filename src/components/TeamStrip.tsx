@@ -1,12 +1,13 @@
 import { rankStyle } from '../format'
 import { CAT_LABEL, CATS } from '../lib/cats'
 import { useModel } from '../model'
-import { useDraft } from '../store'
+import { useDraft, useSession } from '../store'
 
 /** My rank in each category, always in view. Hovering or selecting an available player previews his effect. */
 export function TeamStrip() {
   const { ranks, draft, cats } = useModel()
-  const { previewId, selectedId, set } = useDraft()
+  const { selectedId, set } = useDraft()
+  const previewId = useSession((s) => s.previewId)
   const current = ranks.now
   if (!current) return null
   const focus = previewId ?? selectedId

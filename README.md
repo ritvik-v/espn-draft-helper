@@ -24,10 +24,13 @@ If the panel shows an **Allow** banner, the browser is withholding site access (
 
 ## Use it for your league
 
-Open Setup (`⚙`) and set two things:
+Open Setup (`⚙`) and set three things:
 
 - **League ID**: the `leagueId=` number in your ESPN league's URL. Your own team is found from your login.
-- **Google Sheet**: your tiers, shared as "anyone with the link can view". Then hit **Import**.
+- **Rankings CSV** or **Google Sheet**: your tiers. A rankings CSV (Rank, Player, Avg rank) is split into tiers wherever Avg rank jumps by 2 or more, 3 to 12 players each. A sheet must be shared as "anyone with the link can view"; then hit **Import sheet**.
+- **Hashtag CSV**: your projections export from Hashtag Basketball, with Z Score off. Values switch to it on import.
+
+The top of Setup shows whether all three are in, and Buckets shows a banner until they are.
 
 The sheet is read as blocks: a header row of section names, then players listed down each column under them. A header cell starts with Bucket, Tier, Flier, Upside, Health or Spillage, and a sheet can have several header rows.
 
@@ -42,8 +45,8 @@ Tags in parentheses are optional, and a cell can have several: `Trae Young (FG o
 
 1. Open the panel. It reads your league with your ESPN login and finds your team on its own.
 2. Set any punts in **Team** (or let the punt advisor suggest one once you have a few picks).
-3. **Join ESPN's draft room and keep it open.** Picks come from the room's live feed, because ESPN's league API doesn't update during a draft. Joining late or reloading is fine: the room sends a full board on join and the panel catches up.
-4. On the clock, start in **Buckets**: take from the highest bucket marked "take one now", and skip players marked "can wait".
+3. **Join ESPN's draft room and keep it open.** Picks come from the room's live feed, because ESPN's league API doesn't update during a draft. Joining late or reloading is fine: the room sends a full board on join and the panel catches up. The extension only listens to the room. It never changes ESPN's page, and only runs on ESPN fantasy basketball pages.
+4. On the clock, read the **Take** line under the clock: the best two players by Now. Click one to see him in Players. Buckets shows the same call by tier: take from the highest bucket marked "take one now", and skip players marked "can wait".
 
 ESPN's practice drafts work the same way, so a mock is a full rehearsal.
 
@@ -53,30 +56,26 @@ ESPN's practice drafts work the same way, so a mock is a full rehearsal.
 |---|---|
 | **Heat strip** | 9 cells, one per category. Green helps, red hurts, brighter is stronger. |
 | **Val** | How good he is in a vacuum: a z-score total across the 9 categories (minus any you punt), against the top `teams × roster` players. |
-| **Fit** | How many more categories per week he's expected to win *you*, given your roster. Amber marks your top 3 fits. |
+| **Now** | What taking him adds over this pick and your next: his Fit (how many more categories per week he's expected to win *you*, shown in his details), less what you would likely get from him (or someone as good) at your next pick anyway. A great player who will be back scores low. The green bar behind it compares him to the best Now on the board, and amber marks your top 3. From your third pick, Buckets and Players sort by it. |
 | **%** | The chance he's still there at your next pick. In Buckets, its header sorts each bucket by ADP, earliest first. |
 
-Bucket headers say how many should be left at your next pick. Near your pick, the highest bucket that won't last says **take one now**, players likely to come back say **can wait**, and a line lists who's likely still there next time.
+Bucket headers show how many are left, the ADP range of who's left, and how many should still be there at your next pick. Near your pick, the highest bucket that won't last says **take one now**, players likely to come back say **can wait**, and a line lists who's likely still there next time.
 
 ## Tabs
 
 - **Category strip**: your rank in each category, always visible under the clock. Hover or select a player to preview how he moves each rank.
 - **Buckets**: your tier sheet, with taken players dropping out. A pick range tag is grey before your pick reaches it, green in it, and amber once he's slid past it. Until his range starts, a player stays listed but doesn't count toward "left" or "take one now". The grey number after it is his ADP. **Edit** re-tiers by drag and drop; Setup → **Copy as sheet** copies your buckets back in the sheet's layout.
-- **Players**: everyone, sortable by value, fit, ADP or availability. Click a row (or use the arrow keys) for details, including exactly which of your ranks he changes.
+- **Players**: everyone, sortable by value, Now, fit, ADP or availability. Click a row (or use the arrow keys) for details, including exactly which of your ranks he changes.
 - **Team**: the punt advisor, category ranks with punt toggles, and your roster placed into your league's lineup slots.
 - **League**: category standings with your expected record against each team, the draft board, and rosters.
 
-## In ESPN's draft room
-
-While the panel is open, ESPN's own player list gets badges. Your bucket players get an edge bar (red take now, green can wait, blue in your buckets) and their bucket code under ESPN's rank. `4.1 +.43 50%` next to the position is value, fit, and his chance of lasting to your pick (shown when under 95%). Hover a row for his heat strip.
-
 ## Where the numbers come from
 
-- **Projections**: ESPN.
-- **ADP**: Fantrax, whose drafters are the sharpest of the big sites. ESPN's ADP mostly follows ESPN's own rankings, so it's only a fallback if Fantrax fails to load.
+- **Projections**: a Hashtag Basketball projections CSV imported in Setup, exported with Z Score off. ESPN projections and last season stay selectable under Stats; players missing from the CSV use ESPN projections.
+- **ADP**: ESPN and Fantrax, with ESPN counting double because your league drafts from its board. Only sources that draft the player count. ESPN parks undrafted players near pick 140, so those values are ignored. ESPN alone if Fantrax fails to load.
 - **Category swings**: Josh Lloyd's [2025-26 consistency study](https://joshlloydfantasy.com/research/fantasy-basketball-consistency-study/). Fit counts a lead in a steady category (rebounds, points) as more likely to win the week than the same lead in a streaky one (steals, blocks).
 - **Picks**: the draft room's live feed, placed on ESPN's real pick order (traded picks, third-round reversal) with keepers at their reserved picks. Turn sync off in Setup to enter picks by hand (search + Enter, Cmd+Z to undo).
-- **Buckets**: your Google Sheet, set in Setup.
+- **Buckets**: your rankings CSV or Google Sheet, set in Setup.
 
 ## Dev
 
@@ -86,4 +85,4 @@ While the panel is open, ESPN's own player list gets badges. Your bucket players
 
 ## License
 
-MIT. Not affiliated with or endorsed by ESPN or Fantrax.
+MIT. Not affiliated with or endorsed by ESPN, Fantrax or Hashtag Basketball.

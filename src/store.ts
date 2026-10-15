@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Cat } from './lib/cats'
 import { openPicks, snakeOwners } from './lib/draft'
-import type { BasisKey, League } from './lib/espn'
+import type { Basis, BasisKey, League } from './lib/espn'
 import { DEFAULT_SHEET, type Section, type TierEntry } from './lib/tiers'
 
 export type Pick = { playerId: number; slot: number; overall: number; keeper?: boolean }
@@ -26,14 +26,14 @@ type State = {
   totals: boolean
   showTaken: boolean
   sheetUrl: string
+  /** Imported Hashtag Basketball projections, keyed by ESPN player id. */
+  hashtag: { lines: Record<number, Basis>; importedAt: number; unmatched?: string[] } | null
   espn: { leagueId: string; sync: boolean }
   /** Slot owning each overall pick, from ESPN. Null means a plain snake. */
   pickOwners: number[] | null
   picks: Pick[]
   sections: Section[]
   selectedId: number | null
-  /** Player being hovered, previewed in the category strip. Not persisted. */
-  previewId: number | null
   tab: Tab
 }
 
@@ -58,7 +58,7 @@ type Actions = {
   removeSection: (id: string) => void
 }
 
-type Persisted = Omit<State, 'selectedId' | 'previewId' | 'tab'>
+type Persisted = Omit<State, 'selectedId' | 'tab'>
 
 export const useDraft = create<State & Actions>()(
   persist<State & Actions, [], [], Persisted>(
@@ -75,12 +75,12 @@ export const useDraft = create<State & Actions>()(
       totals: false,
       showTaken: false,
       sheetUrl: DEFAULT_SHEET,
-      espn: { leagueId: '54896', sync: true },
+      hashtag: null,
+      espn: { leagueId: '', sync: true },
       pickOwners: null,
       picks: [],
       sections: [],
       selectedId: null,
-      previewId: null,
       tab: 'Buckets',
 
       set: (patch) => set(patch),
@@ -198,7 +198,13 @@ export const useDraft = create<State & Actions>()(
         const s = persisted as Persisted
         return { ...s, espn: { leagueId: s.espn.leagueId, sync: s.espn.sync } }
       },
-      partialize: ({ selectedId: _, previewId: __, tab: ___, ...rest }) => rest,
+      partialize: ({ selectedId: _, tab: __, ...rest }) => rest,
     },
   ),
 )
+
+/** Hover preview and league sync status. They change often, so they stay out of the persisted store. */
+export const useSession = create<{ previewId: number | null; league: { ok: boolean; error: string | null } }>()(() => ({
+  previewId: null,
+  league: { ok: false, error: null },
+}))

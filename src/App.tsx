@@ -17,8 +17,7 @@ import { espnSwid, fetchLeague } from './lib/espn'
 import { livePicks, mergeLivePicks, type LiveDraft } from './lib/live'
 import { importSheet } from './lib/importSheet'
 import { useModel } from './model'
-import { useDraft, type Tab } from './store'
-import { useBadgeSync } from './useBadgeSync'
+import { useDraft, useSession, type Tab } from './store'
 import { useNow } from './useNow'
 
 const TABS: Record<Tab, ComponentType> = { Buckets, Players, Team: TeamView, League: LeagueView, Setup, Key }
@@ -37,7 +36,7 @@ function useLiveDraft() {
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage) return
     chrome.storage.local.get('liveDraft').then((s) => setStored((s.liveDraft as LiveDraft | undefined) ?? null))
-    // Only the feed's own key: the panel writes badges on every model change, and reacting to those loops.
+    // Only the feed's own key.
     const onChange = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       if (area === 'local' && changes.liveDraft) setStored((changes.liveDraft.newValue as LiveDraft | undefined) ?? null)
     }
@@ -63,6 +62,9 @@ function useLeagueSync(live: LiveDraft | null) {
   })
   const picks = useMemo(() => (live ? livePicks(live) : null), [live])
   useEffect(() => {
+    useSession.setState({ league: { ok: league.isSuccess, error: league.error?.message ?? null } })
+  }, [league.isSuccess, league.error])
+  useEffect(() => {
     if (league.data) applyLeague(picks ? mergeLivePicks(league.data, picks) : league.data, swid.data ?? null)
   }, [league.data, picks, swid.data, applyLeague])
   return { league, practice: !!live && live.leagueId !== espn.leagueId }
@@ -73,7 +75,7 @@ function useFirstImport() {
   const { sections, sheetUrl, setSections } = useDraft()
   const empty = sections.length === 0
   useEffect(() => {
-    if (empty && players.data) importSheet(sheetUrl, players.data).then(setSections, console.error)
+    if (empty && sheetUrl && players.data) importSheet(sheetUrl, players.data).then(setSections, console.error)
   }, [empty, players.data, sheetUrl, setSections])
 }
 
@@ -115,7 +117,6 @@ export default function App() {
   const selectedId = useDraft((s) => s.selectedId)
   useFirstImport()
   useShortcuts()
-  useBadgeSync()
   const View = TABS[tab]
 
   return (
@@ -153,7 +154,7 @@ export default function App() {
         </button>
       </nav>
       <div className="flex min-h-0 flex-1">
-        <main className="min-w-0 flex-1 overflow-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
           <View />
         </main>
         {/* Wide (full tab): details dock on the right. Narrow (side panel): lists expand rows in place,
