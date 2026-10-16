@@ -1,14 +1,14 @@
 import { fmtCat, ordinal, rankStyle, textBtn } from '../format'
 import { CAT_LABEL, CATS } from '../lib/cats'
-import { puntAdvice } from '../lib/punt'
 import { assignSlots } from '../lib/slots'
 import { expectedWins, teamTotals, type Valued } from '../lib/value'
 import { useModel } from '../model'
 import { useDraft } from '../store'
+import { Standings } from './Standings'
 
 export function TeamView() {
-  const { teams, draft, slots, ranks } = useModel()
-  const { mySlot, teamNames, punts, togglePunt, set, totals, starters } = useDraft()
+  const { teams, draft, slots, ranks, puntTips } = useModel()
+  const { mySlot, teamNames, punts, togglePunt, set, starters } = useDraft()
   const roster = teams.rosters[mySlot] ?? []
   const mine = teams.strengths[mySlot]
   const myRanks = ranks.now
@@ -18,14 +18,7 @@ export function TeamView() {
   const others = teams.strengths.filter((_, i) => i !== mySlot)
   const record = others.length ? others.reduce((w, o) => w + expectedWins(mine, o, CATS, teams.winScale), 0) / others.length : 0
   const raw = teamTotals(roster.map((v) => v.line))
-  const advice = puntAdvice({
-    mine,
-    opponents: others,
-    topAvailable: teams.available.slice(0, 20).map((v) => v.z),
-    punts,
-    rosterCount: roster.length,
-    scale: teams.winScale,
-  })
+  const advice = puntTips
   const holder = assignSlots(starters, roster.map((v) => v.player.pos.split('/')))
   const flex = roster.filter((_, i) => !holder.includes(i))
 
@@ -67,7 +60,7 @@ export function TeamView() {
           <tr className="text-left">
             <th className="w-12 font-normal">Cat</th>
             <th className="font-normal">Rank of {n}</th>
-            <th className="w-16 text-right font-normal">{totals ? 'Season' : 'Per game'}</th>
+            <th className="w-16 text-right font-normal">Per game</th>
             <th className="w-12 text-right font-normal" />
           </tr>
         </thead>
@@ -97,6 +90,11 @@ export function TeamView() {
           })}
         </tbody>
       </table>
+
+      <div>
+        <div className="border-b border-zinc-800 pb-0.5 text-[11px] text-zinc-500">League ranks by category</div>
+        <Standings />
+      </div>
 
       <div>
         <div className="flex border-b border-zinc-800 pb-0.5 text-[11px] text-zinc-500">

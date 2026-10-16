@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Cat } from './lib/cats'
 import { openPicks, snakeOwners } from './lib/draft'
-import type { Basis, BasisKey, League } from './lib/espn'
-import { DEFAULT_SHEET, type Section, type TierEntry } from './lib/tiers'
+import type { Basis, League } from './lib/espn'
+import type { Section, TierEntry } from './lib/tiers'
 
 export type Pick = { playerId: number; slot: number; overall: number; keeper?: boolean }
 
@@ -22,10 +22,7 @@ type State = {
   draftDate: number | null
   starters: string[]
   punts: Cat[]
-  basis: BasisKey
-  totals: boolean
   showTaken: boolean
-  sheetUrl: string
   /** Imported Hashtag Basketball projections, keyed by ESPN player id. */
   hashtag: { lines: Record<number, Basis>; importedAt: number; unmatched?: string[] } | null
   espn: { leagueId: string; sync: boolean }
@@ -40,7 +37,7 @@ type State = {
   tab: Tab
 }
 
-export type Tab = 'Buckets' | 'Players' | 'Team' | 'League' | 'Setup' | 'Key'
+export type Tab = 'Tiers' | 'Players' | 'Team' | 'Setup'
 
 type Actions = {
   set: (patch: Partial<State>) => void
@@ -54,15 +51,7 @@ type Actions = {
   newDraft: () => void
   removePick: (playerId: number) => void
   applyLeague: (league: League, swid: string | null) => void
-  setSections: (sections: Section[]) => void
-  moveEntry: (entryId: string, toSection: string, beforeEntry: string | null) => void
-  moveSection: (id: string, beforeId: string | null) => void
-  addEntry: (sectionId: string, entry: Omit<TierEntry, 'id'>) => void
   updateEntry: (entryId: string, patch: Partial<Omit<TierEntry, 'id'>>) => void
-  removeEntry: (entryId: string) => void
-  addSection: () => void
-  renameSection: (id: string, name: string) => void
-  removeSection: (id: string) => void
 }
 
 type Persisted = Omit<State, 'selectedId' | 'tab'>
@@ -78,10 +67,7 @@ export const useDraft = create<State & Actions>()(
       draftDate: null,
       starters: ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F'],
       punts: [],
-      basis: 'proj',
-      totals: false,
       showTaken: false,
-      sheetUrl: DEFAULT_SHEET,
       hashtag: null,
       espn: { leagueId: '', sync: true },
       pickOwners: null,
@@ -90,7 +76,7 @@ export const useDraft = create<State & Actions>()(
       picks: [],
       sections: [],
       selectedId: null,
-      tab: 'Buckets',
+      tab: 'Tiers',
 
       set: (patch) => set(patch),
 
@@ -154,41 +140,6 @@ export const useDraft = create<State & Actions>()(
         }))
       },
 
-      setSections: (sections) => set({ sections }),
-
-      moveEntry: (entryId, toSection, beforeEntry) =>
-        set((s) => {
-          const entry = s.sections.flatMap((x) => x.entries).find((e) => e.id === entryId)
-          if (!entry || entryId === beforeEntry) return s
-          const without = s.sections.map((x) => ({ ...x, entries: x.entries.filter((e) => e.id !== entryId) }))
-          return {
-            sections: without.map((x) => {
-              if (x.id !== toSection) return x
-              const at = beforeEntry ? x.entries.findIndex((e) => e.id === beforeEntry) : -1
-              const entries = [...x.entries]
-              entries.splice(at < 0 ? entries.length : at, 0, entry)
-              return { ...x, entries }
-            }),
-          }
-        }),
-
-      moveSection: (id, beforeId) =>
-        set((s) => {
-          const section = s.sections.find((x) => x.id === id)
-          if (!section || id === beforeId) return s
-          const rest = s.sections.filter((x) => x.id !== id)
-          const at = beforeId ? rest.findIndex((x) => x.id === beforeId) : -1
-          rest.splice(at < 0 ? rest.length : at, 0, section)
-          return { sections: rest }
-        }),
-
-      addEntry: (sectionId, entry) =>
-        set((s) => ({
-          sections: s.sections.map((x) =>
-            x.id === sectionId ? { ...x, entries: [...x.entries, { ...entry, id: crypto.randomUUID() }] } : x,
-          ),
-        })),
-
       updateEntry: (entryId, patch) =>
         set((s) => ({
           sections: s.sections.map((x) => ({
@@ -196,21 +147,6 @@ export const useDraft = create<State & Actions>()(
             entries: x.entries.map((e) => (e.id === entryId ? { ...e, ...patch } : e)),
           })),
         })),
-
-      removeEntry: (entryId) =>
-        set((s) => ({
-          sections: s.sections.map((x) => ({ ...x, entries: x.entries.filter((e) => e.id !== entryId) })),
-        })),
-
-      addSection: () =>
-        set((s) => ({
-          sections: [...s.sections, { id: crypto.randomUUID(), name: `Bucket ${s.sections.length + 1}`, note: null, entries: [] }],
-        })),
-
-      renameSection: (id, name) =>
-        set((s) => ({ sections: s.sections.map((x) => (x.id === id ? { ...x, name } : x)) })),
-
-      removeSection: (id) => set((s) => ({ sections: s.sections.filter((x) => x.id !== id) })),
     }),
     {
       name: 'fhd-draft',

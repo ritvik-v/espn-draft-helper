@@ -11,8 +11,8 @@ import { Avail, Injury } from '../ui'
  * `sheet` is the narrow panel's bottom sheet, `aside` is the wide layout's side column.
  */
 export function PlayerDetail({ variant }: { variant: 'inline' | 'sheet' | 'aside' }) {
-  const { byId, allPlayers, draft, availAtTarget, teams, tiersByPlayer, ranks } = useModel()
-  const { selectedId, teamNames, mySlot, espn, sections, set, draft: draftPlayer, removePick, addEntry } = useDraft()
+  const { byId, allPlayers, draft, availAtTarget, teams, now, tiersByPlayer, ranks } = useModel()
+  const { selectedId, teamNames, mySlot, espn, set, draft: draftPlayer, removePick } = useDraft()
   const player = selectedId === null ? undefined : allPlayers.get(selectedId)
   if (!player) return null
   const id = player.id
@@ -53,12 +53,11 @@ export function PlayerDetail({ variant }: { variant: 'inline' | 'sheet' | 'aside
       <div className="flex flex-wrap gap-x-3">
         {variant === 'inline' && <span className="text-zinc-500">{player.team} · {player.pos}</span>}
         {stat('Val', v?.value.toFixed(1) ?? '-')}
+        {!taken && stat('Now', now.has(id) ? signed(now.get(id) ?? 0, 2) : '-')}
         {stat('Fit', fit === undefined ? '-' : `${signed(fit, 2)} cats/wk`)}
         {stat('ADP', player.adp?.toFixed(1) ?? '-')}
         {!taken && draft.target && stat(`#${draft.target}`, <Avail p={availAtTarget(id)} />)}
         {v && stat('GP', v.gp.toFixed(0))}
-        {v && stat('MIN', v.min.toFixed(1))}
-        {v && stat('Rank', v.rank)}
       </div>
 
       {v && raw && (
@@ -145,18 +144,6 @@ export function PlayerDetail({ variant }: { variant: 'inline' | 'sheet' | 'aside
             </>
           )
         )}
-        <select
-          className={`${input} ml-auto`}
-          value=""
-          onChange={(e) => addEntry(e.target.value, { playerId: id, name: player.name, tag: null })}
-        >
-          <option value="">Add to bucket…</option>
-          {sections.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
       </div>
     </div>
   )

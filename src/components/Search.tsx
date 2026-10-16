@@ -17,9 +17,9 @@ export function Search() {
   const pick = (id: number, andDraft: boolean) => {
     if (andDraft && !espn.sync && !draft.drafted.has(id)) draftPlayer(id)
     else {
-      // Buckets only shows your tiered, available players; anyone else opens in Players.
-      const onBuckets = tiersByPlayer.has(id) && (showTaken || !draft.drafted.has(id))
-      set({ selectedId: id, ...(tab === 'Buckets' && !onBuckets ? { tab: 'Players' as const } : {}) })
+      // Tiers only shows your tiered, available players; anyone else opens in Players.
+      const onTiers = tiersByPlayer.has(id) && (showTaken || !draft.drafted.has(id))
+      set({ selectedId: id, ...(tab === 'Tiers' && !onTiers ? { tab: 'Players' as const } : {}) })
     }
     setQ('')
   }

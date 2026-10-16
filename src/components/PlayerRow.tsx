@@ -1,11 +1,9 @@
-import { useEffect, useRef, type HTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { signed } from '../format'
 import { useModel } from '../model'
 import { useDraft, useSession } from '../store'
 import { Avail, Fingerprint, Injury } from '../ui'
 import { PlayerDetail } from './PlayerDetail'
-
-export type DragProps = Pick<HTMLAttributes<HTMLDivElement>, 'draggable' | 'onDragStart' | 'onDragOver' | 'onDrop'>
 
 /**
  * One player, the same everywhere: name and tags, the 9-category heat strip, value, Now and the chance he's
@@ -14,19 +12,11 @@ export type DragProps = Pick<HTMLAttributes<HTMLDivElement>, 'draggable' | 'onDr
 export function PlayerRow({
   id,
   tag,
-  hint,
   detailed = false,
-  dragProps,
-  over = false,
-  trailing,
 }: {
   id: number
   tag?: ReactNode
-  hint?: ReactNode
   detailed?: boolean
-  dragProps?: DragProps
-  over?: boolean
-  trailing?: ReactNode
 }) {
   const { byId, allPlayers, draft, availAtTarget, now, nowMax, slots, topNow } = useModel()
   const { mySlot, teamAbbrevs, selectedId, punts, espn, set, draft: draftPlayer } = useDraft()
@@ -54,9 +44,8 @@ export function PlayerRow({
   return (
     <div
       ref={ref}
-      {...dragProps}
       data-player-row={id}
-      className={`-mx-1 border-t px-1 ${over ? 'border-amber-300' : 'border-transparent'} ${selected ? 'bg-zinc-900' : ''}`}
+      className={`-mx-1 px-1 ${selected ? 'bg-zinc-900' : ''}`}
     >
       <div
         className={`flex h-7 cursor-default items-center gap-1.5 ${selected ? '' : 'hover:bg-zinc-950'}`}
@@ -73,7 +62,6 @@ export function PlayerRow({
             no slot
           </span>
         )}
-        {!taken && hint}
         <span className="ml-auto flex shrink-0 items-center gap-2 text-right">
           {taken ? (
             <span className={mine ? 'text-emerald-400' : 'text-zinc-600'}>
@@ -97,7 +85,6 @@ export function PlayerRow({
               </span>
             </>
           )}
-          {trailing}
         </span>
       </div>
       {/* Narrow panel: details open in place. Wide layout shows them in the side column instead. */}

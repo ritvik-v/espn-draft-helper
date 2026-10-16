@@ -34,8 +34,8 @@ export function ClockBar({
   live: LiveDraft | null
   practice: boolean
 }) {
-  const { draft, allPlayers, tiersByPlayer, now, slots } = useModel()
-  const { teamNames, teamAbbrevs, mySlot, espn, undo, picks, draftDate, set } = useDraft()
+  const { draft, allPlayers, tiersByPlayer, now, slots, availAtTarget } = useModel()
+  const { teamNames, teamAbbrevs, mySlot, espn, undo, picks, draftDate, sections, set } = useDraft()
   const n = teamNames.length
   const round = Math.ceil(draft.currentPick / n)
   const myTurn = draft.onClock === mySlot
@@ -50,10 +50,20 @@ export function ClockBar({
   // When the last pick came out of your buckets, say which one and what's left in it.
   const lastTier = last && tiersByPlayer.get(last.playerId)?.[0]
   const lastTierLeft = lastTier?.section.entries.filter((e) => e.playerId !== null && !draft.drafted.has(e.playerId)).length
-  const soon = myTurn || (away !== null && away <= 2)
-  const best = soon
-    ? [...now].filter(([id]) => !draft.drafted.has(id) && (!slots.tight || slots.fills(allPlayers.get(id)?.pos ?? ''))).sort((a, b) => b[1] - a[1]).slice(0, 2)
-    : []
+  const tierOf = (id: number) => {
+    const section = tiersByPlayer.get(id)?.[0]?.section
+    return section ? sections.indexOf(section) : Infinity
+  }
+  const best = [...now]
+    .filter(([id]) => !draft.drafted.has(id) && (!slots.tight || slots.fills(allPlayers.get(id)?.pos ?? '')))
+    // On a shown tie, the higher tier goes first, then the one less likely to come back.
+    .sort(
+      (a, b) =>
+        Math.round(b[1] * 100) - Math.round(a[1] * 100) ||
+        tierOf(a[0]) - tierOf(b[0]) ||
+        (availAtTarget(a[0]) ?? 0) - (availAtTarget(b[0]) ?? 0),
+    )
+    .slice(0, 2)
 
   return (
     <header className={`shrink-0 border-b px-3 py-1.5 ${myTurn ? 'border-amber-300 bg-amber-300 text-black' : 'border-zinc-900'}`}>
@@ -125,7 +135,7 @@ export function ClockBar({
           </span>
         )}
         <span className="ml-auto shrink-0">
-          {!espn.sync ? 'Manual' : live ? (practice ? 'Practice draft · live' : 'Draft room live') : synced ? 'ESPN' : 'ESPN…'}
+          {!espn.sync ? 'Manual' : live ? (practice ? 'Practice draft · live' : 'Draft room live') : practice ? 'Practice draft' : synced ? 'ESPN' : 'ESPN…'}
         </span>
       </div>
       {best.length > 0 && (
@@ -137,7 +147,13 @@ export function ClockBar({
               <button className="truncate font-semibold hover:underline" title="Show in Players" onClick={() => set({ selectedId: id, tab: 'Players' })}>
                 {allPlayers.get(id)?.name}
               </button>
-              <span className={`text-[11px] ${myTurn ? 'text-black/70' : 'text-zinc-500'}`}>{signed(gain, 2)}</span>
+              <span
+                className={`shrink-0 text-[11px] ${myTurn ? 'text-black/70' : 'text-zinc-500'}`}
+                title="Now, and the chance he's still there at your following pick if you pass on him"
+              >
+                {signed(gain, 2)}
+                {availAtTarget(id) !== null && ` ${Math.round((availAtTarget(id) ?? 0) * 100)}%`}
+              </span>
             </span>
           ))}
         </div>

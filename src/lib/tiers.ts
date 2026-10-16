@@ -1,15 +1,6 @@
 export type TierEntry = { id: string; playerId: number | null; name: string; tag: string | null }
 export type Section = { id: string; name: string; note: string | null; entries: TierEntry[] }
 
-export const DEFAULT_SHEET = ''
-
-export const sheetCsvUrl = (url: string) => {
-  const id = url.match(/\/d\/([\w-]+)/)?.[1]
-  if (!id) throw new Error('Not a Google Sheets URL')
-  const gid = url.match(/[#&?]gid=(\d+)/)?.[1]
-  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv${gid ? `&gid=${gid}` : ''}`
-}
-
 export const parseCsv = (text: string) => {
   const rows: string[][] = []
   let row: string[] = []
@@ -51,7 +42,7 @@ const normalize = (name: string) =>
     .trim()
     .split(/\s+/)
 
-/** Matches sheet names to ESPN players: exact first, then same last name with a nickname-style first name (Steph/Stephen). */
+/** Matches CSV names to ESPN players: exact first, then same last name with a nickname-style first name (Steph/Stephen). */
 export const nameMatcher = (players: { id: number; name: string }[]) => {
   const exact = new Map<string, number>()
   const byLast = new Map<string, { first: string; id: number }[]>()
@@ -71,71 +62,4 @@ export const nameMatcher = (players: { id: number; name: string }[]) => {
     )
     return candidates.length === 1 ? candidates[0].id : null
   }
-}
-
-const isHeader = (cell: string) => /^(bucket|tier|flier|upside|health|spillage)\b/i.test(cell.trim())
-const isNote = (cell: string) => /^[^a-z]+$/.test(cell) && /[A-Z]/.test(cell)
-
-/** "Trae Young (FG or TO) (34+)" → name "Trae Young", tag "FG or TO, 34+". */
-const splitTag = (cell: string) => {
-  const tags = [...cell.matchAll(/\(([^)]*)\)/g)].map((m) => m[1].trim()).filter(Boolean)
-  return { name: cell.split('(')[0].trim(), tag: tags.length ? tags.join(', ') : null }
-}
-
-/**
- * Reads a tier sheet laid out as blocks: a header row of section names, then players listed down each column.
- * Rows before the first header row (titles), number-only cells (running counts) and all-caps cells (notes) aren't players.
- */
-export function parseTierSheet(csv: string, match: (name: string) => number | null): Section[] {
-  const sections: Section[] = []
-  let columns: (Section | null)[] = []
-  for (const row of parseCsv(csv)) {
-    if (row.some(isHeader)) {
-      columns = row.map((cell) => {
-        if (!cell.trim()) return null
-        const section: Section = { id: crypto.randomUUID(), name: cell.trim(), note: null, entries: [] }
-        sections.push(section)
-        return section
-      })
-      continue
-    }
-    row.forEach((raw, col) => {
-      const cell = raw.trim()
-      const section = columns[col]
-      if (!section || !cell || /^\d+$/.test(cell)) return
-      if (isNote(cell)) {
-        section.note = cell
-        return
-      }
-      const { name, tag } = splitTag(cell)
-      section.entries.push({ id: crypto.randomUUID(), playerId: match(name), name, tag })
-    })
-  }
-  return sections
-}
-
-/** The picks a player is worth, from a tag or bucket name: "40-55", "35+" or "Upside Fliers (~100+)". */
-export const pickRange = (text: string | null) => {
-  const m = text?.match(/(\d+)\s*(?:-\s*(\d+)|\+)/)
-  return m ? { from: Number(m[1]), to: m[2] ? Number(m[2]) : null } : null
-}
-
-/** An entry's own range, else its bucket's. */
-export const entryRange = (section: Section, entry: TierEntry) => pickRange(entry.tag) ?? pickRange(section.name)
-
-/**
- * Buckets back in the sheet's layout (header row of up to 8 bucket names, players down each column,
- * a blank row between blocks), so edits made here can be pasted back into the Google Sheet.
- */
-export function sectionsToRows(sections: Section[], perRow = 8): string[][] {
-  const rows: string[][] = []
-  for (let i = 0; i < sections.length; i += perRow) {
-    const block = sections.slice(i, i + perRow)
-    const columns = block.map((s) => [...(s.note ? [s.note] : []), ...s.entries.map((e) => (e.tag ? `${e.name} (${e.tag})` : e.name))])
-    rows.push(block.map((s) => s.name))
-    const depth = Math.max(0, ...columns.map((c) => c.length))
-    for (let r = 0; r < depth; r++) rows.push(columns.map((c) => c[r] ?? ''))
-    rows.push([])
-  }
-  return rows
 }

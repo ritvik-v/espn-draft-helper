@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { availability, openPicks, slotForPick, snakeOwners } from './draft'
+import { availability, calibration, openPicks, slotForPick, snakeOwners } from './draft'
 
 describe('snake order', () => {
   it('reverses every other round', () => {
@@ -24,5 +24,18 @@ describe('availability', () => {
   it('keeps a fallen player alive for a few picks rather than zeroing out', () => {
     expect(availability(5, 25, 28)).toBeGreaterThan(0.05)
     expect(availability(5, 25, 28)).toBeLessThan(0.5)
+  })
+})
+
+describe('calibration', () => {
+  const board = [{ reach: 1, lasts: 0.9 }, { reach: 1, lasts: 0.8 }, { reach: 1, lasts: 0.95 }, { reach: 0.5, lasts: 0.5 }]
+  const taken = (k: number) => board.reduce((n, { reach, lasts }) => n + reach * (1 - lasts ** k), 0)
+
+  it('scales the odds so the expected number taken matches the picks made', () => {
+    expect(taken(calibration(board, 2))).toBeCloseTo(2, 5)
+  })
+
+  it('keeps everyone when no one picks in between', () => {
+    expect(calibration(board, 0)).toBe(0)
   })
 })

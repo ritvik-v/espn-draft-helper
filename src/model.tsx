@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { createContext, use, useCallback, useMemo, type ReactNode } from 'react'
 import { CATS, type Cat, type CatLine } from './lib/cats'
 import { blendAdp, fetchFantraxAdp } from './lib/adp'
-import { availability, openPicks } from './lib/draft'
+import { availability, calibration, openPicks } from './lib/draft'
 import { nowScores } from './lib/now'
+import { puntAdvice } from './lib/punt'
 import { fetchPlayers, type Player } from './lib/espn'
 import { openSlots } from './lib/slots'
-import { entryRange, type Section, type TierEntry } from './lib/tiers'
+import type { Section, TierEntry } from './lib/tiers'
 import { activeCats, fitScores, replacementLevel, teamStrength, valuePlayers, winScales, type Valued } from './lib/value'
 import { ownersOf, useDraft } from './store'
 
@@ -30,12 +31,13 @@ function useBuildModel() {
     [espn.data, fantrax.data, hashtag],
   )
   const players = { ...espn, data }
-  const { teamCount, rosterSize, mySlot, punts, basis, totals, picks, sections, pickOwners, starters } = useDraft()
+  const { teamCount, rosterSize, mySlot, punts, picks, sections, pickOwners, starters } = useDraft()
+  const basis = hashtag ? 'hashtag' : 'proj'
 
   const poolSize = teamCount * rosterSize
   const { valued, swing } = useMemo(
-    () => valuePlayers(players.data ?? [], { basis, totals, punts, poolSize }),
-    [players.data, basis, totals, punts, poolSize],
+    () => valuePlayers(players.data ?? [], { basis, totals: false, punts, poolSize }),
+    [players.data, basis, punts, poolSize],
   )
   const byId = useMemo(() => new Map(valued.map((v) => [v.player.id, v])), [valued])
   const allPlayers = useMemo(() => new Map((players.data ?? []).map((p) => [p.id, p])), [players.data])
@@ -48,9 +50,8 @@ function useBuildModel() {
     const currentPick = open[0] ?? owners.length + 1
     const onClock = open.length ? owners[currentPick - 1] : null
     const mine = open.filter((o) => owners[o - 1] === mySlot)
-    // When I'm on the clock, the useful question is whether a player lasts to my *following* pick.
-    const target = onClock === mySlot ? mine[1] : mine[0]
-    return { drafted, byPick, owners, currentPick, onClock, mine, target: target ?? null }
+    // You decide at your upcoming pick, so the question is whether he lasts from there to the one after.
+    return { drafted, byPick, owners, currentPick, onClock, mine, target: mine[1] ?? null, from: mine[0] ?? currentPick }
   }, [picks, pickOwners, teamCount, rosterSize, mySlot])
 
   const teams = useMemo(() => {
@@ -89,6 +90,19 @@ function useBuildModel() {
     return { now, withPlayer, teams: teams.strengths.length }
   }, [teams, mySlot, byId, rosterSize])
 
+  const puntTips = useMemo(() => {
+    const mine = teams.strengths[mySlot]
+    if (!mine) return []
+    return puntAdvice({
+      mine,
+      opponents: teams.strengths.filter((_, i) => i !== mySlot),
+      topAvailable: teams.available.slice(0, 20).map((v) => v.z),
+      punts,
+      rosterCount: teams.rosters[mySlot]?.length ?? 0,
+      scale: teams.winScale,
+    })
+  }, [teams, mySlot, punts])
+
   // Starting slots my roster can't fill yet. Once my remaining picks only just cover them, a player who
   // fills none of them costs a starter.
   const slots = useMemo(() => {
@@ -107,14 +121,23 @@ function useBuildModel() {
     return out
   }, [sections])
 
+  // Per-player ADP odds alone undercount how many go between your picks, so scale them to the real count.
+  const oddsPower = useMemo(() => {
+    if (draft.target === null) return 1
+    const adps = [...allPlayers.values()].flatMap((p) => (p.adp === null || draft.drafted.has(p.id) ? [] : [p.adp]))
+    const toFrom = adps.map((adp) => availability(adp, draft.currentPick, draft.from))
+    const reachPower = calibration(toFrom.map((lasts) => ({ reach: 1, lasts })), draft.from - draft.currentPick)
+    const board = adps.map((adp, i) => ({ reach: toFrom[i] ** reachPower, lasts: availability(adp, draft.from, draft.target!) }))
+    return calibration(board, draft.target - draft.from - 1)
+  }, [allPlayers, draft])
 
   const availAtTarget = useCallback(
     (id: number) => {
       const p = allPlayers.get(id)
       if (!p || draft.drafted.has(id) || draft.target === null) return null
-      return p.adp === null ? 1 : availability(p.adp, draft.currentPick, draft.target)
+      return p.adp === null ? 1 : availability(p.adp, draft.from, draft.target) ** oddsPower
     },
-    [allPlayers, draft],
+    [allPlayers, draft, oddsPower],
   )
 
   const now = useMemo(() => nowScores(teams.fit, availAtTarget), [teams.fit, availAtTarget])
@@ -126,30 +149,7 @@ function useBuildModel() {
     [now, tiersByPlayer],
   )
 
-  // The take-now-or-wait read on your buckets.
-  const outlook = useMemo(() => {
-    const isOpen = (e: TierEntry) => e.playerId === null || !draft.drafted.has(e.playerId)
-    // Players whose sheet range ("40-55", "35+") starts after your pick stay listed, since you can still take
-    // them early, but don't count toward what's left or "take one now".
-    const pick = draft.mine[0] ?? draft.currentPick
-    const inPlay = (s: Section, e: TierEntry) => isOpen(e) && (entryRange(s, e)?.from ?? 0) <= pick
-    const live = sections.filter((s) => s.entries.some((e) => inPlay(s, e)))
-    // How many of each bucket should still be on the board at your next pick.
-    const expected = new Map(
-      sections.map((s) => {
-        const ids = new Set(s.entries.flatMap((e) => (e.playerId !== null && inPlay(s, e) ? [e.playerId] : [])))
-        return [s.id, draft.target && ids.size ? [...ids].reduce((n, id) => n + (availAtTarget(id) ?? 0), 0) : null] as const
-      }),
-    )
-    // Near your pick: the highest bucket that won't last, and the top buckets you're choosing from.
-    const soon = draft.onClock === mySlot || (draft.mine[0] ?? Infinity) - draft.currentPick <= 2
-    const lastChance = soon ? live.find((s) => (expected.get(s.id) ?? Infinity) < 1)?.id : undefined
-    const waitBuckets = new Set(soon ? live.slice(0, 2).map((s) => s.id) : [])
-    const canWait = (sectionId: string, playerId: number) => waitBuckets.has(sectionId) && (availAtTarget(playerId) ?? 0) >= 0.7
-    return { isOpen, inPlay, pick, live, current: live[0]?.id, expected, soon, lastChance, waitBuckets, canWait }
-  }, [sections, draft, availAtTarget, mySlot])
-
-  return { players, allPlayers, valued, byId, draft, teams, now, nowFirst, nowMax, ranks, slots, topNow, tiersByPlayer, outlook, availAtTarget, cats: activeCats(punts) }
+  return { players, allPlayers, valued, byId, draft, teams, now, nowFirst, nowMax, ranks, puntTips, slots, topNow, tiersByPlayer, availAtTarget, cats: activeCats(punts) }
 }
 
 export type Model = ReturnType<typeof useBuildModel>

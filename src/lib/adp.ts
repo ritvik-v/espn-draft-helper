@@ -16,15 +16,16 @@ export async function fetchFantraxAdp(players: { id: number; name: string }[]) {
 
 // ESPN parks players nobody drafts at an ADP of about 140, so anything this late isn't a real pick.
 const ESPN_UNDRAFTED = 139
+// Off ESPN's board means an ESPN room mostly won't take him before here.
+const ESPN_LATE = 150
 // ESPN leagues draft from ESPN's board, so its ADP predicts them better than Fantrax's.
 const ESPN_WEIGHT = 2
 
-/** Weighted mean over the sources that draft him; null if neither does. */
+/** Weighted blend, ESPN counting double; null if neither source drafts him. */
 export function blendAdp(espn: number | null, fantrax: number | undefined) {
-  const sources = [
-    ...(espn !== null && espn < ESPN_UNDRAFTED ? [{ adp: espn, w: ESPN_WEIGHT }] : []),
-    ...(fantrax !== undefined ? [{ adp: fantrax, w: 1 }] : []),
-  ]
-  const w = sources.reduce((n, s) => n + s.w, 0)
-  return w ? sources.reduce((n, s) => n + s.adp * s.w, 0) / w : null
+  if (espn === null) return fantrax ?? null
+  const onBoard = espn < ESPN_UNDRAFTED ? espn : null
+  if (fantrax === undefined) return onBoard
+  const espnSide = onBoard ?? Math.max(ESPN_LATE, fantrax)
+  return (espnSide * ESPN_WEIGHT + fantrax) / (ESPN_WEIGHT + 1)
 }

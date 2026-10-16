@@ -17,12 +17,12 @@ export type LivePick = { teamId: number; playerId: number; overall?: number }
 const RECORD = 45
 
 /**
- * Reads picks out of the draft room's INIT snapshot. The board is a run of 45-byte records in pick
+ * Reads the draft room's INIT snapshot: the team on every pick, and the picks made. The board is a run of 45-byte records in pick
  * order: team id at byte 12, overall pick at 16, player id at 20 (-1 until made). Keepers are included.
  * The rest of the format is unknown, so find the run by its overall numbers counting 1, 2, 3. Round one's
  * team ids also count 1, 2, 3 four bytes earlier, so take the longest run: that's the whole board.
  */
-export function parseInit(base64: string): LivePick[] {
+export function parseInit(base64: string): { owners: number[]; picks: LivePick[] } {
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
   const view = new DataView(bytes.buffer)
   const int = (offset: number) => view.getInt32(offset)
@@ -38,17 +38,20 @@ export function parseInit(base64: string): LivePick[] {
     const length = runAt(start)
     if (length >= 3 && length > best.length) best = { start, length }
   }
+  const owners: number[] = []
   const picks: LivePick[] = []
   for (let i = 0; i < best.length; i++) {
     const record = best.start + RECORD * i
+    const teamId = int(record + 12)
     const playerId = int(record + 20)
-    if (playerId > 0) picks.push({ overall: i + 1, teamId: int(record + 12), playerId })
+    owners.push(teamId)
+    if (playerId > 0) picks.push({ overall: i + 1, teamId, playerId })
   }
-  return picks
+  return { owners, picks }
 }
 
 export const livePicks = (live: LiveDraft): LivePick[] => [
-  ...(live.init ? parseInit(live.init) : []),
+  ...(live.init ? parseInit(live.init).picks : []),
   ...live.lines.map((line) => {
     const [, teamId, playerId] = line.split(' ')
     return { teamId: Number(teamId), playerId: Number(playerId) }
@@ -79,4 +82,10 @@ export function mergeLivePicks(league: League, live: LivePick[]): League {
     cursor = Math.max(cursor, at)
   }
   return { ...league, made: made.sort((a, b) => a.overall - b.overall) }
+}
+
+/** The room's own pick order (team id per overall pick), or null before its board arrives. */
+export const liveOwners = (live: LiveDraft): number[] | null => {
+  const owners = live.init ? parseInit(live.init).owners : []
+  return owners.length ? owners : null
 }

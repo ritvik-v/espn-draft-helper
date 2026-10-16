@@ -20,3 +20,17 @@ const survival = (pick: number, adp: number) => 1 / (1 + Math.exp((pick - adp) /
 /** Chance a still-available player lasts until overall pick `target` (1-based), given we're at pick `current`. */
 export const availability = (adp: number, current: number, target: number) =>
   target <= current ? 1 : Math.min(1, survival(target, adp) / survival(current, adp))
+
+/** Power on each chance of lasting that makes the expected number taken (weighted by `reach`) equal `picks`. */
+export function calibration(board: { reach: number; lasts: number }[], picks: number) {
+  const taken = (k: number) => board.reduce((n, { reach, lasts }) => n + reach * (1 - lasts ** k), 0)
+  if (picks <= 0) return 0
+  if (taken(64) < picks) return 64
+  let [lo, hi] = [0, 64]
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (taken(mid) < picks) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
+}

@@ -20,7 +20,7 @@
         if (!forwarded.has(this) && this.target instanceof NativeWS && typeof value === 'string' && KEEP.test(value)) {
           forwarded.add(this)
           const leagueId = this.target.url.match(DRAFT_SOCKET)?.[1]
-          if (leagueId) window.postMessage({ __bucketList: true, leagueId, line: value.trim() }, window.location.origin)
+          if (leagueId) window.postMessage({ __onTheClock: true, leagueId, line: value.trim() }, window.location.origin)
         }
       } catch {
         // Never let the helper break the draft room.

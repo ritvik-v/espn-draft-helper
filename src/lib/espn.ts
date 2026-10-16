@@ -22,12 +22,11 @@ export type Player = {
   adp: number | null
   rank: number
   proj: Basis | null
-  last: Basis | null
   /** Hashtag Basketball projection, merged in by the model from an imported CSV. */
   hashtag: Basis | null
 }
 
-export type BasisKey = 'proj' | 'last' | 'hashtag'
+export type BasisKey = 'proj' | 'hashtag'
 
 const PRO_TEAMS: Record<number, string> = {
   0: 'FA', 1: 'ATL', 2: 'BOS', 3: 'NO', 4: 'CHI', 5: 'CLE', 6: 'DAL', 7: 'DEN', 8: 'DET', 9: 'GS', 10: 'HOU',
@@ -96,7 +95,6 @@ export async function fetchPlayers(): Promise<Omit<Player, 'hashtag'>[]> {
     rank: p.draftRanksByRankType?.STANDARD?.rank ?? 999,
     adp: p.ownership?.averageDraftPosition || null,
     proj: toBasis(p.stats?.find((s) => s.id === `10${SEASON}`)),
-    last: toBasis(p.stats?.find((s) => s.id === `00${SEASON - 1}`)),
   }))
 }
 

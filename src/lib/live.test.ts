@@ -28,9 +28,10 @@ const initFor = (records: [teamId: number, playerId: number][], headerBytes = 13
 }
 
 describe('parseInit', () => {
-  it('reads made picks with their overall numbers and skips open ones', () => {
+  it('reads the team on every pick, and the made picks with their overall numbers', () => {
     const init = initFor([[1, 10], [2, 20], [2, -1], [1, 900], [2, -1], [2, -1]])
-    expect(parseInit(init)).toEqual([
+    expect(parseInit(init).owners).toEqual([1, 2, 2, 1, 2, 2])
+    expect(parseInit(init).picks).toEqual([
       { overall: 1, teamId: 1, playerId: 10 },
       { overall: 2, teamId: 2, playerId: 20 },
       { overall: 4, teamId: 1, playerId: 900 },
@@ -39,7 +40,7 @@ describe('parseInit', () => {
 
   it('ignores round one team ids that also count 1, 2, 3', () => {
     const init = initFor([[1, 10], [2, 20], [3, 30], [3, -1], [2, -1], [1, -1]])
-    expect(parseInit(init)).toEqual([
+    expect(parseInit(init).picks).toEqual([
       { overall: 1, teamId: 1, playerId: 10 },
       { overall: 2, teamId: 2, playerId: 20 },
       { overall: 3, teamId: 3, playerId: 30 },
@@ -47,7 +48,7 @@ describe('parseInit', () => {
   })
 
   it('returns nothing for a payload without a pick board', () => {
-    expect(parseInit(btoa('not a draft'))).toEqual([])
+    expect(parseInit(btoa('not a draft'))).toEqual({ owners: [], picks: [] })
   })
 })
 

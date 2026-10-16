@@ -1,11 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { AccessBanner } from './components/AccessBanner'
-import { Buckets } from './components/Buckets'
-import { Key } from './components/Key'
 import { ClockBar } from './components/ClockBar'
 import { DraftRoomCheck } from './components/DraftRoomCheck'
-import { LeagueView } from './components/LeagueView'
 import { PlayerDetail } from './components/PlayerDetail'
 import { Players } from './components/Players'
 import { RecentPicks } from './components/RecentPicks'
@@ -13,16 +10,16 @@ import { Search } from './components/Search'
 import { Setup } from './components/Setup'
 import { TeamStrip } from './components/TeamStrip'
 import { TeamView } from './components/TeamView'
+import { Tiers } from './components/Tiers'
 import { espnSwid, fetchLeague } from './lib/espn'
-import { livePicks, mergeLivePicks, type LiveDraft } from './lib/live'
-import { importSheet } from './lib/importSheet'
-import { useModel } from './model'
+import { liveOwners, livePicks, mergeLivePicks, type LiveDraft } from './lib/live'
 import { useDraft, useSession, type Tab } from './store'
+import { useDraftRoom, type DraftRoom } from './useDraftRoom'
 import { useNow } from './useNow'
 
-const TABS: Record<Tab, ComponentType> = { Buckets, Players, Team: TeamView, League: LeagueView, Setup, Key }
-const ICON_TABS: Tab[] = ['Key', 'Setup']
-const LIST_TABS: Tab[] = ['Buckets', 'Players']
+const TABS: Record<Tab, ComponentType> = { Tiers, Players, Team: TeamView, Setup }
+const ICON_TABS: Tab[] = ['Setup']
+const LIST_TABS: Tab[] = ['Tiers', 'Players']
 
 const LIVE_FRESH_MS = 90_000
 
@@ -43,14 +40,16 @@ function useLiveDraft() {
     return () => chrome.storage.onChanged.removeListener(onChange)
   }, [])
   const live = stored && !stored.done && now - stored.seen < LIVE_FRESH_MS ? stored : null
-  return { live, feedLeague: stored?.leagueId ?? null }
+  return { live, feed: stored }
 }
 
-function useLeagueSync(live: LiveDraft | null) {
+function useLeagueSync(live: LiveDraft | null, feed: LiveDraft | null, room: DraftRoom | null) {
   const espn = useDraft((s) => s.espn)
   const applyLeague = useDraft((s) => s.applyLeague)
-  // An open draft room wins, so a practice draft (its own temporary league) works like the real one.
-  const leagueId = live?.leagueId ?? espn.leagueId
+  // A finished or unloadable room falls back to your league: ESPN deletes practice leagues after the draft.
+  const [deadRoom, setDeadRoom] = useState<string | null>(null)
+  const roomOpen = room && room.leagueId !== deadRoom && !(feed?.leagueId === room.leagueId && feed.done) ? room.leagueId : null
+  const leagueId = live?.leagueId ?? roomOpen ?? espn.leagueId
   const swid = useQuery({ queryKey: ['swid'], queryFn: espnSwid, staleTime: Infinity })
   const league = useQuery({
     queryKey: ['league', leagueId],
@@ -59,25 +58,20 @@ function useLeagueSync(live: LiveDraft | null) {
     refetchInterval: 5000,
     retry: 1,
   })
+  if (league.isError && !live && leagueId === roomOpen) setDeadRoom(roomOpen)
   const picks = useMemo(() => (live ? livePicks(live) : null), [live])
+  const board = useMemo(() => (live ? liveOwners(live) : null), [live])
   useEffect(() => {
     useSession.setState({ league: { ok: league.isSuccess, error: league.error?.message ?? null } })
   }, [league.isSuccess, league.error])
   useEffect(() => {
     if (!league.data) return
     useDraft.getState().enterLeague(leagueId)
-    applyLeague(picks ? mergeLivePicks(league.data, picks) : league.data, swid.data ?? null)
-  }, [league.data, leagueId, picks, swid.data, applyLeague])
-  return { league, practice: !!live && live.leagueId !== espn.leagueId }
-}
-
-function useFirstImport() {
-  const { players } = useModel()
-  const { sections, sheetUrl, setSections } = useDraft()
-  const empty = sections.length === 0
-  useEffect(() => {
-    if (empty && sheetUrl && players.data) importSheet(sheetUrl, players.data).then(setSections, console.error)
-  }, [empty, players.data, sheetUrl, setSections])
+    // The room's board is its real pick order: a mock is a plain snake even if your league reverses round 3.
+    const base = board ? { ...league.data, owners: board } : league.data
+    applyLeague(picks ? mergeLivePicks(base, picks) : base, swid.data ?? null)
+  }, [league.data, leagueId, picks, board, swid.data, applyLeague])
+  return { league, practice: leagueId !== espn.leagueId }
 }
 
 function useShortcuts() {
@@ -113,17 +107,17 @@ function useShortcuts() {
 export default function App() {
   const tab = useDraft((s) => s.tab)
   const setTab = (t: Tab) => useDraft.getState().set({ tab: t })
-  const { live, feedLeague } = useLiveDraft()
-  const { league, practice } = useLeagueSync(live)
+  const { live, feed } = useLiveDraft()
+  const room = useDraftRoom()
+  const { league, practice } = useLeagueSync(live, feed, room)
   const selectedId = useDraft((s) => s.selectedId)
-  useFirstImport()
   useShortcuts()
   const View = TABS[tab]
 
   return (
     <div className="flex h-full flex-col">
       <AccessBanner />
-      <DraftRoomCheck feedLeague={feedLeague} />
+      <DraftRoomCheck feedLeague={feed?.leagueId ?? null} room={room} />
       <ClockBar syncError={league.error?.message ?? null} synced={league.isSuccess} live={live} practice={practice} />
       <TeamStrip />
       <nav className="flex h-8 shrink-0 items-center gap-3 border-b border-zinc-900 px-3">
@@ -139,13 +133,6 @@ export default function App() {
             </button>
           ))}
         <Search />
-        <button
-          title="What the colors and numbers mean"
-          onClick={() => setTab(tab === 'Key' ? 'Buckets' : 'Key')}
-          className={`h-full border-b ${tab === 'Key' ? 'border-zinc-200 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
-        >
-          ?
-        </button>
         <button
           title="Setup"
           onClick={() => setTab('Setup')}
@@ -165,7 +152,7 @@ export default function App() {
           <RecentPicks />
         </aside>
       </div>
-      {selectedId !== null && !LIST_TABS.includes(tab) && (
+      {selectedId !== null && !LIST_TABS.includes(tab) && tab !== 'Setup' && (
         <div className="max-h-[45%] shrink-0 overflow-y-auto border-t border-zinc-700 bg-black lg:hidden">
           <PlayerDetail variant="sheet" />
         </div>

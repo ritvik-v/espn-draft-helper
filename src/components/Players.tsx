@@ -6,13 +6,13 @@ import { useModel } from '../model'
 import { useDraft } from '../store'
 import { PlayerRow } from './PlayerRow'
 
-type Sort = 'value' | 'fit' | 'now' | 'adp' | 'avail'
+type Sort = 'value' | 'now' | 'adp' | 'avail'
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C']
 const LIMIT = 200
 
-/** Everyone, not just your buckets. Same rows as Buckets so nothing has to be relearned. */
+/** Everyone, not just your tiers. Same rows as Tiers so nothing has to be relearned. */
 export function Players() {
-  const { valued, draft, teams, now, nowFirst, tiersByPlayer, availAtTarget, byId } = useModel()
+  const { valued, draft, now, nowFirst, tiersByPlayer, availAtTarget, byId } = useModel()
   const { selectedId } = useDraft()
   const [q, setQ] = useState('')
   const [pos, setPos] = useState('')
@@ -25,7 +25,6 @@ export function Players() {
     const key = (v: Valued): number => {
       const id = v.player.id
       if (sort === 'value') return v.value
-      if (sort === 'fit') return teams.fit.get(id) ?? -99
       if (sort === 'now') return now.get(id) ?? -99
       if (sort === 'adp') return -(v.player.adp ?? 999)
       return -(availAtTarget(id) ?? 2)
@@ -42,7 +41,7 @@ export function Players() {
     // Keep a player picked from search visible even if the filters would hide him.
     const picked = selectedId !== null ? byId.get(selectedId) : undefined
     return picked && !list.includes(picked) ? [picked, ...list] : list
-  }, [valued, q, pos, showTaken, sort, draft.drafted, teams.fit, now, availAtTarget, selectedId, byId])
+  }, [valued, q, pos, showTaken, sort, draft.drafted, now, availAtTarget, selectedId, byId])
 
   const sortBtn = (s: Sort, label: string, className = '') => (
     <button className={`${className} text-right ${sort === s ? 'text-zinc-100' : 'hover:text-zinc-300'}`} onClick={() => setSort(s)}>
@@ -65,7 +64,6 @@ export function Players() {
           <button className={showTaken ? 'text-zinc-200' : textBtn} onClick={() => setShowTaken(!showTaken)}>
             Taken
           </button>
-          {sortBtn('fit', 'By fit')}
           {sortBtn('adp', 'By ADP')}
           <span className="ml-auto flex items-center gap-2">
             <span className="hidden gap-px lg:flex">
@@ -92,8 +90,7 @@ export function Players() {
               tag={
                 <span className="shrink-0 text-[11px] text-zinc-500">
                   {v.player.pos}
-                  {tier && <span className="text-sky-400"> {tier.section.name.replace(/^Bucket /, 'B')}</span>}
-                  <span className="ml-1">{v.player.adp ? Math.round(v.player.adp) : ''}</span>
+                  {tier && <span className="text-sky-400"> {tier.section.name}</span>}
                 </span>
               }
             />
